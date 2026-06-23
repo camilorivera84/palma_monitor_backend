@@ -19,7 +19,21 @@ const PORT = process.env.PORT || 5000;
 // ============================================
 // MIDDLEWARES
 // ============================================
-app.use(cors());
+
+// Configuración CORS mejorada para permitir peticiones desde el frontend
+const corsOptions = {
+  origin: [
+    'https://palma-monitor-frontend.pages.dev',
+    'https://38186680.palma-monitor-frontend.pages.dev',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
