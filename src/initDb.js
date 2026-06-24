@@ -1,11 +1,11 @@
-// src/initDb.js
 const pool = require('./config/database');
+const bcrypt = require('bcryptjs');
 
 async function initDatabase() {
   try {
     console.log('🔧 Iniciando creación de tablas...');
 
-    // Crear todas las tablas (igual que antes)
+    // Crear todas las tablas
     await pool.query(`
       CREATE TABLE IF NOT EXISTS palmas (
         id SERIAL PRIMARY KEY,
@@ -64,20 +64,22 @@ async function initDatabase() {
     `);
     console.log('✅ Tabla plagas creada');
 
-    // Eliminar el usuario admin si existe
-    await pool.query(`DELETE FROM usuarios WHERE username = 'admin'`);
-    console.log('🗑️ Usuario admin anterior eliminado');
+    // ELIMINAR usuarios existentes para limpiar
+    await pool.query(`DELETE FROM usuarios WHERE username IN ('admin', 'admin2', 'admin3')`);
+    console.log('🗑️ Usuarios anteriores eliminados');
 
-    // Hash fijo para la contraseña 'admin123' generado con bcrypt
-    const fixedHash = '$2a$10$YQxVpKq.WYcKjqXQxVpKq.WYcKjqXQxVpKq.WYcKjqXQxVpKq.WYcKjq';
+    // Generar hash NUEVO para admin123
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash('admin123', salt);
+    console.log('🔑 Hash generado:', hashedPassword);
 
-    // Insertar el usuario con el hash fijo
+    // Insertar admin con hash nuevo
     await pool.query(`
       INSERT INTO usuarios (username, email, password, role) 
       VALUES ($1, $2, $3, $4)
-    `, ['admin', 'admin@palma.com', fixedHash, 'admin']);
+    `, ['admin', 'admin@palma.com', hashedPassword, 'admin']);
 
-    console.log('✅ Usuario admin creado con contraseña admin123 (hash fijo)');
+    console.log('✅ Usuario admin creado con contraseña admin123');
 
     console.log('🎉 Base de datos inicializada correctamente');
     return { success: true, message: 'Base de datos inicializada correctamente' };
