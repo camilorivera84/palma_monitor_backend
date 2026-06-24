@@ -6,7 +6,7 @@ async function initDatabase() {
   try {
     console.log('🔧 Iniciando creación de tablas...');
 
-    // 1. Crear tabla de palmas
+    // 1. Crear tabla de palmas (CON la columna codigo_estado)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS palmas (
         id SERIAL PRIMARY KEY,
@@ -15,12 +15,13 @@ async function initDatabase() {
         palma VARCHAR(50) NOT NULL,
         estado VARCHAR(20) DEFAULT 'ACTIVA',
         descarte VARCHAR(50),
+        codigo_estado VARCHAR(20),
         latitud DECIMAL(10, 8),
         longitud DECIMAL(11, 8),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Tabla palmas creada');
+    console.log('✅ Tabla palmas creada con columna codigo_estado');
 
     // 2. Crear tabla de usuarios
     await pool.query(`
@@ -68,11 +69,26 @@ async function initDatabase() {
     `);
     console.log('✅ Tabla plagas creada');
 
-    // 5. ELIMINAR usuarios existentes para limpiar
-    await pool.query(`DELETE FROM usuarios WHERE username = 'admin'`);
-    console.log('🗑️ Usuario admin anterior eliminado');
+    // 5. Insertar datos de prueba en palmas (opcional)
+    const palmasCheck = await pool.query('SELECT COUNT(*) FROM palmas');
+    if (parseInt(palmasCheck.rows[0].count) === 0) {
+      await pool.query(`
+        INSERT INTO palmas (lote, linea, palma, estado, codigo_estado, descarte, latitud, longitud) 
+        VALUES 
+        ('LOTE-001', 'LINEA-001', 'Palma 1', 'ACTIVA', 'ACT', 'ZONA A', 4.12345, -72.12345),
+        ('LOTE-001', 'LINEA-001', 'Palma 2', 'ACTIVA', 'ACT', 'ZONA B', 4.12346, -72.12346),
+        ('LOTE-001', 'LINEA-002', 'Palma 3', 'INACTIVA', 'INA', 'ZONA C', 4.12347, -72.12347)
+      `);
+      console.log('✅ Datos de prueba insertados en palmas');
+    }
 
-    // 6. Crear usuario admin con contraseña admin123
+    // 6. ELIMINAR usuarios existentes para limpiar
+    await pool.query(
+      `DELETE FROM usuarios WHERE username IN ('admin', 'admin2', 'admin3')`,
+    );
+    console.log('🗑️ Usuarios anteriores eliminados');
+
+    // 7. Crear usuario admin con contraseña admin123
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash('admin123', salt);
     console.log('🔑 Hash generado:', hashedPassword);
@@ -87,6 +103,17 @@ async function initDatabase() {
 
     console.log('✅ Usuario admin creado con contraseña admin123');
 
+    // 8. Agregar columna si existe en el código pero no en la tabla (por si acaso)
+    try {
+      await pool.query(`
+        ALTER TABLE palmas 
+        ADD COLUMN IF NOT EXISTS codigo_estado VARCHAR(20);
+      `);
+      console.log('✅ Columna codigo_estado verificada/agregada');
+    } catch (error) {
+      console.log('ℹ️ La columna codigo_estado ya existe o no se pudo agregar');
+    }
+
     console.log('🎉 Base de datos inicializada correctamente');
     return {
       success: true,
@@ -98,5 +125,4 @@ async function initDatabase() {
   }
 }
 
-// ✅ EXPORTAR LA FUNCIÓN CORRECTAMENTE
 module.exports = initDatabase;
