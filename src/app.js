@@ -85,6 +85,44 @@ app.get('/init-db', async (req, res) => {
   }
 });
 
+// ============================================
+// RUTA TEMPORAL PARA AGREGAR COLUMNA codigo_estado
+// ============================================
+app.get('/add-column', async (req, res) => {
+  try {
+    // Verificar si la columna existe
+    const checkColumn = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'palmas' AND column_name = 'codigo_estado'
+    `);
+
+    if (checkColumn.rows.length === 0) {
+      // Agregar la columna
+      await pool.query(`
+        ALTER TABLE palmas 
+        ADD COLUMN codigo_estado VARCHAR(20);
+      `);
+      res.json({
+        success: true,
+        message: '✅ Columna codigo_estado agregada correctamente',
+      });
+    } else {
+      res.json({
+        success: true,
+        message: 'ℹ️ La columna codigo_estado ya existe',
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error en /add-column:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al agregar la columna',
+      error: error.message,
+    });
+  }
+});
+
 // Autenticación
 app.use('/api/auth', authRoutes);
 
@@ -262,6 +300,10 @@ app.listen(PORT, () => {
   console.log(`\n  📌 Ruta de inicialización:`);
   console.log(
     `    GET /init-db (inicializa la base de datos y crea usuario admin)`,
+  );
+  console.log(`  📌 Ruta de mantenimiento:`);
+  console.log(
+    `    GET /add-column (agrega columna codigo_estado si no existe)`,
   );
   console.log(`\n✅ Servidor listo para usar\n`);
 });
