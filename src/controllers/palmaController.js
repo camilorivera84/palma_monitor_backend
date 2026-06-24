@@ -22,12 +22,13 @@ exports.importCSV = async (req, res) => {
 
     console.log('📂 Leyendo archivo CSV...');
 
+    // ✅ CORREGIDO: Leer con encabezados
     await new Promise((resolve, reject) => {
       fs.createReadStream(filePath)
         .pipe(
           csv({
             separator: ',',
-            headers: false,
+            headers: true, // ✅ La primera fila contiene los nombres de las columnas
             skipLines: 0,
           }),
         )
@@ -40,17 +41,18 @@ exports.importCSV = async (req, res) => {
 
     for (const row of results) {
       try {
-        const id = parseInt(row.field1) || 0;
-        const lote = `LOTE ${row.field2}` || '';
-        const linea = `LINEA ${row.field3}` || '';
-        const palma = parseInt(row.field0) || 0;
-        const estado = row.field4 || '';
-        const codigo_estado = parseInt(row.field5) || 0;
-        const descarte = row.field6 || '';
-        const latitud = parseFloat(row.field8) || 0;
-        const longitud = parseFloat(row.field9) || 0;
-        const norte = parseFloat(row.field10) || 0;
-        const este = parseFloat(row.field11) || 0;
+        // ✅ CORREGIDO: Mapeo correcto de columnas
+        const id = parseInt(row.Id) || 0;
+        const lote = row.LOTE || '';
+        const linea = row.LINEA || '';
+        const palma = row.PALMA || '';
+        const estado = row.ESTADO || '';
+        const codigo_estado = parseInt(row.CODESTADO) || 0;
+        const descarte = row.DESCARTE || '';
+        const latitud = parseFloat(row.LATITUD) || 0;
+        const longitud = parseFloat(row.LONGITUD) || 0;
+        const norte = parseFloat(row.NORTE) || 0;
+        const este = parseFloat(row.ESTE) || 0;
 
         const query = `
           INSERT INTO public.palmas 
@@ -152,7 +154,7 @@ exports.getAll = async (req, res) => {
         row.latitud && row.longitud
           ? {
               type: 'Point',
-              coordinates: [row.longitud, row.latitud],
+              coordinates: [parseFloat(row.longitud), parseFloat(row.latitud)],
             }
           : null,
     }));
@@ -213,7 +215,7 @@ exports.getById = async (req, res) => {
         row.latitud && row.longitud
           ? {
               type: 'Point',
-              coordinates: [row.longitud, row.latitud],
+              coordinates: [parseFloat(row.longitud), parseFloat(row.latitud)],
             }
           : null,
     };
@@ -529,7 +531,7 @@ exports.getNearby = async (req, res) => {
 
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
-    const radiusNum = parseFloat(radius) / 111320; // Convertir metros a grados (aproximado)
+    const radiusNum = parseFloat(radius) / 111320;
 
     const result = await pool.query(
       `
