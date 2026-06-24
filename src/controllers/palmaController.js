@@ -22,13 +22,12 @@ exports.importCSV = async (req, res) => {
 
     console.log('📂 Leyendo archivo CSV...');
 
-    // Leer el archivo CSV - El archivo usa coma como separador y NO tiene encabezados
     await new Promise((resolve, reject) => {
       fs.createReadStream(filePath)
         .pipe(
           csv({
-            separator: ',', // Usa coma como separador
-            headers: false, // No tiene encabezados
+            separator: ',',
+            headers: false,
             skipLines: 0,
           }),
         )
@@ -39,22 +38,8 @@ exports.importCSV = async (req, res) => {
 
     console.log(`📊 ${results.length} registros encontrados`);
 
-    // Insertar datos en PostgreSQL
     for (const row of results) {
       try {
-        // Mapeo de columnas del CSV:
-        // field1 = id
-        // field2 = lote (número)
-        // field3 = linea (número)
-        // field4 = estado (ACTIVA/ERRADICADA)
-        // field5 = codigo_estado (1/0)
-        // field6 = descarte (LOTE 1B/TELARAÑA/LAS 20)
-        // field7 = ? (parece vacío o adicional)
-        // field8 = latitud
-        // field9 = longitud
-        // field10 = norte
-        // field11 = este
-
         const id = parseInt(row.field1) || 0;
         const lote = `LOTE ${row.field2}` || '';
         const linea = `LINEA ${row.field3}` || '';
@@ -68,24 +53,22 @@ exports.importCSV = async (req, res) => {
         const este = parseFloat(row.field11) || 0;
 
         const query = `
-                    INSERT INTO public.palmas 
-                    (id, lote, linea, palma, estado, codigo_estado, descarte, 
-                     latitud, longitud, norte, este, geom)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
-                            ST_SetSRID(ST_MakePoint($9, $8), 4326))
-                    ON CONFLICT (id) DO UPDATE SET
-                        lote = EXCLUDED.lote,
-                        linea = EXCLUDED.linea,
-                        palma = EXCLUDED.palma,
-                        estado = EXCLUDED.estado,
-                        codigo_estado = EXCLUDED.codigo_estado,
-                        descarte = EXCLUDED.descarte,
-                        latitud = EXCLUDED.latitud,
-                        longitud = EXCLUDED.longitud,
-                        norte = EXCLUDED.norte,
-                        este = EXCLUDED.este,
-                        geom = EXCLUDED.geom
-                `;
+          INSERT INTO public.palmas 
+          (id, lote, linea, palma, estado, codestado, descarte, 
+           latitud, longitud, norte, este)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          ON CONFLICT (id) DO UPDATE SET
+            lote = EXCLUDED.lote,
+            linea = EXCLUDED.linea,
+            palma = EXCLUDED.palma,
+            estado = EXCLUDED.estado,
+            codestado = EXCLUDED.codestado,
+            descarte = EXCLUDED.descarte,
+            latitud = EXCLUDED.latitud,
+            longitud = EXCLUDED.longitud,
+            norte = EXCLUDED.norte,
+            este = EXCLUDED.este
+        `;
 
         await pool.query(query, [
           id,
@@ -114,7 +97,6 @@ exports.importCSV = async (req, res) => {
       }
     }
 
-    // Eliminar archivo temporal
     try {
       fs.unlinkSync(filePath);
     } catch (err) {
@@ -142,32 +124,43 @@ exports.importCSV = async (req, res) => {
 };
 
 // ============================================
-// OBTENER TODAS LAS PALMAS
+// OBTENER TODAS LAS PALMAS (SIN POSTGIS)
 // ============================================
 exports.getAll = async (req, res) => {
   try {
     const result = await pool.query(`
-            SELECT 
-                id, 
-                lote, 
-                linea, 
-                palma, 
-                estado, 
-                codigo_estado, 
-                descarte,
-                latitud, 
-                longitud, 
-                norte, 
-                este,
-                ST_AsGeoJSON(geom)::json as geom
-            FROM public.palmas
-            ORDER BY id
-        `);
+      SELECT 
+        id, 
+        lote, 
+        linea, 
+        palma, 
+        estado, 
+        codestado,
+        descarte,
+        latitud, 
+        longitud, 
+        norte, 
+        este
+      FROM public.palmas
+      ORDER BY id
+    `);
+
+    // Agregar campo geom para compatibilidad con el frontend
+    const data = result.rows.map((row) => ({
+      ...row,
+      geom:
+        row.latitud && row.longitud
+          ? {
+              type: 'Point',
+              coordinates: [row.longitud, row.latitud],
+            }
+          : null,
+    }));
 
     res.json({
       success: true,
-      count: result.rows.length,
-      data: result.rows,
+      count: data.length,
+      data: data,
     });
   } catch (error) {
     console.error('Error al obtener palmas:', error);
@@ -188,22 +181,21 @@ exports.getById = async (req, res) => {
 
     const result = await pool.query(
       `
-            SELECT 
-                id, 
-                lote, 
-                linea, 
-                palma, 
-                estado, 
-                codigo_estado, 
-                descarte,
-                latitud, 
-                longitud, 
-                norte, 
-                este,
-                ST_AsGeoJSON(geom)::json as geom
-            FROM public.palmas
-            WHERE id = $1
-        `,
+      SELECT 
+        id, 
+        lote, 
+        linea, 
+        palma, 
+        estado, 
+        codestado,
+        descarte,
+        latitud, 
+        longitud, 
+        norte, 
+        este
+      FROM public.palmas
+      WHERE id = $1
+      `,
       [id],
     );
 
@@ -214,9 +206,21 @@ exports.getById = async (req, res) => {
       });
     }
 
+    const row = result.rows[0];
+    const data = {
+      ...row,
+      geom:
+        row.latitud && row.longitud
+          ? {
+              type: 'Point',
+              coordinates: [row.longitud, row.latitud],
+            }
+          : null,
+    };
+
     res.json({
       success: true,
-      data: result.rows[0],
+      data: data,
     });
   } catch (error) {
     console.error('Error al obtener palma:', error);
@@ -249,22 +253,21 @@ exports.update = async (req, res) => {
 
     const result = await pool.query(
       `
-            UPDATE public.palmas
-            SET 
-                lote = $1, 
-                linea = $2, 
-                palma = $3, 
-                estado = $4,
-                codigo_estado = $5, 
-                descarte = $6, 
-                latitud = $7,
-                longitud = $8, 
-                norte = $9, 
-                este = $10,
-                geom = ST_SetSRID(ST_MakePoint($8, $7), 4326)
-            WHERE id = $11
-            RETURNING *
-        `,
+      UPDATE public.palmas
+      SET 
+        lote = $1, 
+        linea = $2, 
+        palma = $3, 
+        estado = $4,
+        codestado = $5, 
+        descarte = $6, 
+        latitud = $7,
+        longitud = $8, 
+        norte = $9, 
+        este = $10
+      WHERE id = $11
+      RETURNING *
+      `,
       [
         lote,
         linea,
@@ -401,14 +404,14 @@ exports.search = async (req, res) => {
 exports.getStats = async (req, res) => {
   try {
     const result = await pool.query(`
-            SELECT 
-                COUNT(*) as total_palmas,
-                COUNT(DISTINCT lote) as total_lotes,
-                COUNT(DISTINCT linea) as total_lineas,
-                COUNT(DISTINCT estado) as total_estados,
-                COUNT(DISTINCT descarte) as total_descartes
-            FROM public.palmas
-        `);
+      SELECT 
+        COUNT(*) as total_palmas,
+        COUNT(DISTINCT lote) as total_lotes,
+        COUNT(DISTINCT linea) as total_lineas,
+        COUNT(DISTINCT estado) as total_estados,
+        COUNT(DISTINCT descarte) as total_descartes
+      FROM public.palmas
+    `);
 
     res.json({
       success: true,
@@ -433,23 +436,22 @@ exports.getByLote = async (req, res) => {
 
     const result = await pool.query(
       `
-            SELECT 
-                id, 
-                lote, 
-                linea, 
-                palma, 
-                estado, 
-                codigo_estado, 
-                descarte,
-                latitud, 
-                longitud, 
-                norte, 
-                este,
-                ST_AsGeoJSON(geom)::json as geom
-            FROM public.palmas
-            WHERE lote = $1
-            ORDER BY id
-        `,
+      SELECT 
+        id, 
+        lote, 
+        linea, 
+        palma, 
+        estado, 
+        codestado,
+        descarte,
+        latitud, 
+        longitud, 
+        norte, 
+        este
+      FROM public.palmas
+      WHERE lote = $1
+      ORDER BY id
+      `,
       [lote],
     );
 
@@ -477,23 +479,22 @@ exports.getByEstado = async (req, res) => {
 
     const result = await pool.query(
       `
-            SELECT 
-                id, 
-                lote, 
-                linea, 
-                palma, 
-                estado, 
-                codigo_estado, 
-                descarte,
-                latitud, 
-                longitud, 
-                norte, 
-                este,
-                ST_AsGeoJSON(geom)::json as geom
-            FROM public.palmas
-            WHERE estado = $1
-            ORDER BY id
-        `,
+      SELECT 
+        id, 
+        lote, 
+        linea, 
+        palma, 
+        estado, 
+        codestado,
+        descarte,
+        latitud, 
+        longitud, 
+        norte, 
+        este
+      FROM public.palmas
+      WHERE estado = $1
+      ORDER BY id
+      `,
       [estado],
     );
 
@@ -513,7 +514,7 @@ exports.getByEstado = async (req, res) => {
 };
 
 // ============================================
-// OBTENER PALMAS CERCANAS
+// OBTENER PALMAS CERCANAS (SIN POSTGIS)
 // ============================================
 exports.getNearby = async (req, res) => {
   try {
@@ -526,32 +527,30 @@ exports.getNearby = async (req, res) => {
       });
     }
 
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+    const radiusNum = parseFloat(radius) / 111320; // Convertir metros a grados (aproximado)
+
     const result = await pool.query(
       `
-            SELECT 
-                id, 
-                lote, 
-                linea, 
-                palma, 
-                estado, 
-                codigo_estado, 
-                descarte,
-                latitud, 
-                longitud, 
-                norte, 
-                este,
-                ST_Distance(
-                    geom,
-                    ST_SetSRID(ST_MakePoint($1, $2), 4326)
-                ) as distancia
-            FROM public.palmas
-            WHERE ST_Distance(
-                geom,
-                ST_SetSRID(ST_MakePoint($1, $2), 4326)
-            ) <= $3
-            ORDER BY distancia
-        `,
-      [lng, lat, radius],
+      SELECT 
+        id, 
+        lote, 
+        linea, 
+        palma, 
+        estado, 
+        codestado,
+        descarte,
+        latitud, 
+        longitud, 
+        norte, 
+        este,
+        SQRT(POW(latitud - $1, 2) + POW(longitud - $2, 2)) as distancia
+      FROM public.palmas
+      WHERE SQRT(POW(latitud - $1, 2) + POW(longitud - $2, 2)) <= $3
+      ORDER BY distancia
+      `,
+      [latNum, lngNum, radiusNum],
     );
 
     res.json({
@@ -578,23 +577,22 @@ exports.getByCodigoEstado = async (req, res) => {
 
     const result = await pool.query(
       `
-            SELECT 
-                id, 
-                lote, 
-                linea, 
-                palma, 
-                estado, 
-                codigo_estado, 
-                descarte,
-                latitud, 
-                longitud, 
-                norte, 
-                este,
-                ST_AsGeoJSON(geom)::json as geom
-            FROM public.palmas
-            WHERE codigo_estado = $1
-            ORDER BY id
-        `,
+      SELECT 
+        id, 
+        lote, 
+        linea, 
+        palma, 
+        estado, 
+        codestado,
+        descarte,
+        latitud, 
+        longitud, 
+        norte, 
+        este
+      FROM public.palmas
+      WHERE codestado = $1
+      ORDER BY id
+      `,
       [codigo],
     );
 
@@ -622,23 +620,22 @@ exports.getByZona = async (req, res) => {
 
     const result = await pool.query(
       `
-            SELECT 
-                id, 
-                lote, 
-                linea, 
-                palma, 
-                estado, 
-                codigo_estado, 
-                descarte,
-                latitud, 
-                longitud, 
-                norte, 
-                este,
-                ST_AsGeoJSON(geom)::json as geom
-            FROM public.palmas
-            WHERE descarte = $1
-            ORDER BY id
-        `,
+      SELECT 
+        id, 
+        lote, 
+        linea, 
+        palma, 
+        estado, 
+        codestado,
+        descarte,
+        latitud, 
+        longitud, 
+        norte, 
+        este
+      FROM public.palmas
+      WHERE descarte = $1
+      ORDER BY id
+      `,
       [zona],
     );
 
@@ -663,13 +660,13 @@ exports.getByZona = async (req, res) => {
 exports.countByEstado = async (req, res) => {
   try {
     const result = await pool.query(`
-            SELECT 
-                estado,
-                COUNT(*) as total
-            FROM public.palmas
-            GROUP BY estado
-            ORDER BY total DESC
-        `);
+      SELECT 
+        estado,
+        COUNT(*) as total
+      FROM public.palmas
+      GROUP BY estado
+      ORDER BY total DESC
+    `);
 
     res.json({
       success: true,
@@ -694,23 +691,22 @@ exports.getLatest = async (req, res) => {
 
     const result = await pool.query(
       `
-            SELECT 
-                id, 
-                lote, 
-                linea, 
-                palma, 
-                estado, 
-                codigo_estado, 
-                descarte,
-                latitud, 
-                longitud, 
-                norte, 
-                este,
-                ST_AsGeoJSON(geom)::json as geom
-            FROM public.palmas
-            ORDER BY id DESC
-            LIMIT $1
-        `,
+      SELECT 
+        id, 
+        lote, 
+        linea, 
+        palma, 
+        estado, 
+        codestado,
+        descarte,
+        latitud, 
+        longitud, 
+        norte, 
+        este
+      FROM public.palmas
+      ORDER BY id DESC
+      LIMIT $1
+      `,
       [limit],
     );
 
