@@ -67,9 +67,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Ruta temporal para inicializar la base de datos
 app.get('/init-db', async (req, res) => {
   try {
-    // Importar dinámicamente el script de inicialización
     const initDb = require('./initDb');
-    // Ejecutar la inicialización
     await initDb();
     res.json({
       success: true,
@@ -86,38 +84,63 @@ app.get('/init-db', async (req, res) => {
 });
 
 // ============================================
-// RUTA TEMPORAL PARA AGREGAR COLUMNA codigo_estado
+// RUTA TEMPORAL PARA AGREGAR COLUMNAS FALTANTES
 // ============================================
 app.get('/add-column', async (req, res) => {
   try {
-    // Verificar si la columna existe
-    const checkColumn = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'palmas' AND column_name = 'codigo_estado'
-    `);
+    // Definir todas las columnas que debe tener la tabla palmas
+    const columnsToAdd = [
+      { name: 'codigo_estado', type: 'VARCHAR(20)' },
+      { name: 'norte', type: 'VARCHAR(20)' },
+      { name: 'sur', type: 'VARCHAR(20)' },
+      { name: 'este', type: 'VARCHAR(20)' },
+      { name: 'oeste', type: 'VARCHAR(20)' },
+      { name: 'zona', type: 'VARCHAR(50)' },
+      { name: 'sector', type: 'VARCHAR(50)' },
+      { name: 'bloque', type: 'VARCHAR(50)' },
+      { name: 'estado_actual', type: 'VARCHAR(20)' },
+      { name: 'fecha_estado', type: 'DATE' },
+      { name: 'observaciones', type: 'TEXT' },
+      { name: 'anio_siembra', type: 'INTEGER' },
+      { name: 'productividad', type: 'DECIMAL(10,2)' },
+      { name: 'fecha_ultima_visita', type: 'DATE' },
+    ];
 
-    if (checkColumn.rows.length === 0) {
-      // Agregar la columna
-      await pool.query(`
-        ALTER TABLE palmas 
-        ADD COLUMN codigo_estado VARCHAR(20);
-      `);
-      res.json({
-        success: true,
-        message: '✅ Columna codigo_estado agregada correctamente',
-      });
-    } else {
-      res.json({
-        success: true,
-        message: 'ℹ️ La columna codigo_estado ya existe',
-      });
+    const results = [];
+
+    for (const col of columnsToAdd) {
+      // Verificar si la columna existe
+      const checkColumn = await pool.query(
+        `
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'palmas' AND column_name = $1
+      `,
+        [col.name],
+      );
+
+      if (checkColumn.rows.length === 0) {
+        // Agregar la columna
+        await pool.query(`
+          ALTER TABLE palmas 
+          ADD COLUMN ${col.name} ${col.type};
+        `);
+        results.push(`✅ Columna ${col.name} agregada correctamente`);
+      } else {
+        results.push(`ℹ️ La columna ${col.name} ya existe`);
+      }
     }
+
+    res.json({
+      success: true,
+      message: 'Columnas verificadas/agregadas correctamente',
+      results,
+    });
   } catch (error) {
     console.error('❌ Error en /add-column:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al agregar la columna',
+      message: 'Error al agregar las columnas',
       error: error.message,
     });
   }
@@ -303,7 +326,7 @@ app.listen(PORT, () => {
   );
   console.log(`  📌 Ruta de mantenimiento:`);
   console.log(
-    `    GET /add-column (agrega columna codigo_estado si no existe)`,
+    `    GET /add-column (agrega columnas faltantes a la tabla palmas)`,
   );
   console.log(`\n✅ Servidor listo para usar\n`);
 });
