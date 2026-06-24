@@ -64,6 +64,27 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // RUTAS
 // ============================================
 
+// Ruta temporal para inicializar la base de datos
+app.get('/init-db', async (req, res) => {
+  try {
+    // Importar dinámicamente el script de inicialización
+    const initDb = require('./initDb');
+    // Ejecutar la inicialización
+    await initDb();
+    res.json({
+      success: true,
+      message: 'Base de datos inicializada correctamente',
+    });
+  } catch (error) {
+    console.error('❌ Error en /init-db:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al inicializar la base de datos',
+      error: error.message,
+    });
+  }
+});
+
 // Autenticación
 app.use('/api/auth', authRoutes);
 
@@ -238,6 +259,10 @@ app.listen(PORT, () => {
   console.log(`    POST /api/catalogo/plagas`);
   console.log(`    PUT  /api/catalogo/plagas/:id`);
   console.log(`    DELETE /api/catalogo/plagas/:id`);
+  console.log(`\n  📌 Ruta de inicialización:`);
+  console.log(
+    `    GET /init-db (inicializa la base de datos y crea usuario admin)`,
+  );
   console.log(`\n✅ Servidor listo para usar\n`);
 });
 
