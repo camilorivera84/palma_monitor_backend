@@ -8,7 +8,11 @@ const pool = require('../config/database');
 // ============================================
 exports.importCSV = async (req, res) => {
   try {
+    console.log('🚀 INICIO DE IMPORTACIÓN');
+    console.log('📁 req.file:', req.file);
+
     if (!req.file) {
+      console.log('❌ No hay archivo');
       return res.status(400).json({
         success: false,
         message: 'No se subió ningún archivo',
@@ -16,33 +20,63 @@ exports.importCSV = async (req, res) => {
     }
 
     const filePath = req.file.path;
+    console.log('📂 Ruta del archivo:', filePath);
+
+    // Verificar que el archivo existe
+    if (!fs.existsSync(filePath)) {
+      console.log('❌ El archivo no existe:', filePath);
+      return res.status(400).json({
+        success: false,
+        message: 'El archivo no existe',
+      });
+    }
+
     const results = [];
     let inserted = 0;
     let errors = [];
 
     console.log('📂 Leyendo archivo CSV...');
 
-    // ✅ CORREGIDO: Leer con encabezados
     await new Promise((resolve, reject) => {
-      fs.createReadStream(filePath)
+      const stream = fs
+        .createReadStream(filePath)
         .pipe(
           csv({
             separator: ',',
-            headers: true, // ✅ La primera fila contiene los nombres de las columnas
+            headers: true,
             skipLines: 0,
           }),
         )
-        .on('data', (data) => results.push(data))
-        .on('end', resolve)
-        .on('error', reject);
+        .on('data', (data) => {
+          console.log('📄 Fila leída:', JSON.stringify(data));
+          results.push(data);
+        })
+        .on('end', () => {
+          console.log('📊 Fin de lectura, total:', results.length);
+          resolve();
+        })
+        .on('error', (err) => {
+          console.log('❌ Error en stream:', err);
+          reject(err);
+        });
     });
 
     console.log(`📊 ${results.length} registros encontrados`);
 
-    for (const row of results) {
+    if (results.length === 0) {
+      console.log('❌ No se encontraron registros en el CSV');
+      return res.json({
+        success: false,
+        message: 'El archivo CSV está vacío o no tiene encabezados',
+        total: 0,
+        inserted: 0,
+      });
+    }
+
+    for (let i = 0; i < results.length; i++) {
+      const row = results[i];
       try {
-        // ✅ CORREGIDO: Mapeo correcto de columnas
-        const id = parseInt(row.Id) || 0;
+        const id = parseInt(row.Id) || i + 1;
         const lote = row.LOTE || '';
         const linea = row.LINEA || '';
         const palma = row.PALMA || '';
@@ -53,6 +87,12 @@ exports.importCSV = async (req, res) => {
         const longitud = parseFloat(row.LONGITUD) || 0;
         const norte = parseFloat(row.NORTE) || 0;
         const este = parseFloat(row.ESTE) || 0;
+
+        if (i < 5) {
+          console.log(
+            `📝 Fila ${i}: id=${id}, lote=${lote}, linea=${linea}, palma=${palma}, estado=${estado}, codigo_estado=${codigo_estado}, descarte=${descarte}, latitud=${latitud}, longitud=${longitud}, norte=${norte}, este=${este}`,
+          );
+        }
 
         const query = `
           INSERT INTO public.palmas 
@@ -91,21 +131,24 @@ exports.importCSV = async (req, res) => {
           console.log(`✅ ${inserted} registros insertados...`);
         }
       } catch (err) {
+        console.error(`❌ Error en fila ${i}:`, err.message);
         errors.push({
           row: row,
           error: err.message,
         });
-        console.error('❌ Error en fila:', err.message);
       }
     }
 
     try {
       fs.unlinkSync(filePath);
+      console.log('🗑️ Archivo temporal eliminado');
     } catch (err) {
       console.warn('No se pudo eliminar el archivo temporal:', err.message);
     }
 
-    console.log(`✅ Importación completada: ${inserted} registros`);
+    console.log(
+      `✅ Importación completada: ${inserted} registros de ${results.length}`,
+    );
 
     res.json({
       success: true,
@@ -116,7 +159,7 @@ exports.importCSV = async (req, res) => {
       errorDetails: errors.slice(0, 10),
     });
   } catch (error) {
-    console.error('Error en importación:', error);
+    console.error('❌ Error en importación:', error);
     res.status(500).json({
       success: false,
       message: 'Error al importar el archivo',
