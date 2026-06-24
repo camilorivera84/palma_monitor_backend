@@ -54,7 +54,7 @@ exports.importCSV = async (req, res) => {
 
         const query = `
           INSERT INTO public.palmas 
-          (id, lote, linea, palma, estado, codestado, descarte, 
+          (id, lote, linea, palma, estado, codigo_estado, descarte, 
            latitud, longitud, norte, este)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
           ON CONFLICT (id) DO UPDATE SET
@@ -62,7 +62,7 @@ exports.importCSV = async (req, res) => {
             linea = EXCLUDED.linea,
             palma = EXCLUDED.palma,
             estado = EXCLUDED.estado,
-            codestado = EXCLUDED.codestado,
+            codigo_estado = EXCLUDED.codigo_estado,
             descarte = EXCLUDED.descarte,
             latitud = EXCLUDED.latitud,
             longitud = EXCLUDED.longitud,
@@ -124,7 +124,7 @@ exports.importCSV = async (req, res) => {
 };
 
 // ============================================
-// OBTENER TODAS LAS PALMAS (SIN POSTGIS)
+// OBTENER TODAS LAS PALMAS
 // ============================================
 exports.getAll = async (req, res) => {
   try {
@@ -135,7 +135,7 @@ exports.getAll = async (req, res) => {
         linea, 
         palma, 
         estado, 
-        codestado,
+        codigo_estado,
         descarte,
         latitud, 
         longitud, 
@@ -187,7 +187,7 @@ exports.getById = async (req, res) => {
         linea, 
         palma, 
         estado, 
-        codestado,
+        codigo_estado,
         descarte,
         latitud, 
         longitud, 
@@ -259,7 +259,7 @@ exports.update = async (req, res) => {
         linea = $2, 
         palma = $3, 
         estado = $4,
-        codestado = $5, 
+        codigo_estado = $5, 
         descarte = $6, 
         latitud = $7,
         longitud = $8, 
@@ -442,7 +442,7 @@ exports.getByLote = async (req, res) => {
         linea, 
         palma, 
         estado, 
-        codestado,
+        codigo_estado,
         descarte,
         latitud, 
         longitud, 
@@ -485,7 +485,7 @@ exports.getByEstado = async (req, res) => {
         linea, 
         palma, 
         estado, 
-        codestado,
+        codigo_estado,
         descarte,
         latitud, 
         longitud, 
@@ -514,7 +514,7 @@ exports.getByEstado = async (req, res) => {
 };
 
 // ============================================
-// OBTENER PALMAS CERCANAS (SIN POSTGIS)
+// OBTENER PALMAS CERCANAS
 // ============================================
 exports.getNearby = async (req, res) => {
   try {
@@ -539,7 +539,7 @@ exports.getNearby = async (req, res) => {
         linea, 
         palma, 
         estado, 
-        codestado,
+        codigo_estado,
         descarte,
         latitud, 
         longitud, 
@@ -583,14 +583,14 @@ exports.getByCodigoEstado = async (req, res) => {
         linea, 
         palma, 
         estado, 
-        codestado,
+        codigo_estado,
         descarte,
         latitud, 
         longitud, 
         norte, 
         este
       FROM public.palmas
-      WHERE codestado = $1
+      WHERE codigo_estado = $1
       ORDER BY id
       `,
       [codigo],
@@ -626,7 +626,7 @@ exports.getByZona = async (req, res) => {
         linea, 
         palma, 
         estado, 
-        codestado,
+        codigo_estado,
         descarte,
         latitud, 
         longitud, 
@@ -697,7 +697,7 @@ exports.getLatest = async (req, res) => {
         linea, 
         palma, 
         estado, 
-        codestado,
+        codigo_estado,
         descarte,
         latitud, 
         longitud, 
