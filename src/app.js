@@ -34,6 +34,12 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+// ============================================
+// MANEJO EXPLÍCITO DE SOLICITUDES OPTIONS
+// ============================================
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
