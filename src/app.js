@@ -88,12 +88,10 @@ app.get('/init-db', async (req, res) => {
 // ============================================
 app.get('/add-column', async (req, res) => {
   try {
-    // Definir todas las columnas que debe tener la tabla palmas
+    // Columnas que tu código puede estar buscando
+    // pero que no existen en tu tabla
     const columnsToAdd = [
-      { name: 'codigo_estado', type: 'VARCHAR(20)' },
-      { name: 'norte', type: 'VARCHAR(20)' },
       { name: 'sur', type: 'VARCHAR(20)' },
-      { name: 'este', type: 'VARCHAR(20)' },
       { name: 'oeste', type: 'VARCHAR(20)' },
       { name: 'zona', type: 'VARCHAR(50)' },
       { name: 'sector', type: 'VARCHAR(50)' },
@@ -104,30 +102,35 @@ app.get('/add-column', async (req, res) => {
       { name: 'anio_siembra', type: 'INTEGER' },
       { name: 'productividad', type: 'DECIMAL(10,2)' },
       { name: 'fecha_ultima_visita', type: 'DATE' },
+      { name: 'geom', type: 'TEXT' },
     ];
 
     const results = [];
 
     for (const col of columnsToAdd) {
-      // Verificar si la columna existe
-      const checkColumn = await pool.query(
-        `
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'palmas' AND column_name = $1
-      `,
-        [col.name],
-      );
+      try {
+        // Verificar si la columna existe
+        const checkColumn = await pool.query(
+          `
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'palmas' AND column_name = $1
+        `,
+          [col.name],
+        );
 
-      if (checkColumn.rows.length === 0) {
-        // Agregar la columna
-        await pool.query(`
-          ALTER TABLE palmas 
-          ADD COLUMN ${col.name} ${col.type};
-        `);
-        results.push(`✅ Columna ${col.name} agregada correctamente`);
-      } else {
-        results.push(`ℹ️ La columna ${col.name} ya existe`);
+        if (checkColumn.rows.length === 0) {
+          // Agregar la columna
+          await pool.query(`
+            ALTER TABLE palmas 
+            ADD COLUMN ${col.name} ${col.type};
+          `);
+          results.push(`✅ Columna ${col.name} agregada correctamente`);
+        } else {
+          results.push(`ℹ️ La columna ${col.name} ya existe`);
+        }
+      } catch (err) {
+        results.push(`❌ Error al agregar ${col.name}: ${err.message}`);
       }
     }
 
@@ -141,6 +144,29 @@ app.get('/add-column', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error al agregar las columnas',
+      error: error.message,
+    });
+  }
+});
+
+// ============================================
+// RUTA TEMPORAL PARA VER ESTRUCTURA DE TABLA
+// ============================================
+app.get('/table-structure', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'palmas'
+      ORDER BY ordinal_position
+    `);
+    res.json({
+      success: true,
+      columns: result.rows,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
       error: error.message,
     });
   }
@@ -327,6 +353,10 @@ app.listen(PORT, () => {
   console.log(`  📌 Ruta de mantenimiento:`);
   console.log(
     `    GET /add-column (agrega columnas faltantes a la tabla palmas)`,
+  );
+  console.log(`  📌 Ruta de diagnóstico:`);
+  console.log(
+    `    GET /table-structure (muestra la estructura de la tabla palmas)`,
   );
   console.log(`\n✅ Servidor listo para usar\n`);
 });
