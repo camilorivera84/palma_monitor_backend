@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
+const pool = require('../config/database'); // Para consultas directas
 
 // ============================================
 // REGISTRO DE USUARIO (SOLO ADMIN)
@@ -66,11 +67,13 @@ exports.register = async (req, res) => {
 };
 
 // ============================================
-// LOGIN DE USUARIO
+// LOGIN DE USUARIO (CON DEPURACIÓN)
 // ============================================
 exports.login = async (req, res) => {
   try {
     const { username, password } = req.body;
+
+    console.log('🔍 Intento de login:', { username });
 
     if (!username || !password) {
       return res.status(400).json({
@@ -79,15 +82,29 @@ exports.login = async (req, res) => {
       });
     }
 
-    const user = await User.findByUsername(username);
-    if (!user) {
+    // Buscar usuario directamente en la base de datos para depuración
+    const result = await pool.query('SELECT * FROM usuarios WHERE username = $1', [username]);
+    
+    console.log('🔍 Usuario encontrado:', result.rows.length > 0 ? 'Sí' : 'No');
+
+    if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
         message: 'Usuario o contraseña incorrectos',
       });
     }
 
+    const user = result.rows[0];
+    
+    // DEPURACIÓN: Mostrar el hash almacenado
+    console.log('🔍 Hash almacenado:', user.password);
+    console.log('🔍 Longitud del hash:', user.password ? user.password.length : 'null');
+
+    // Usar el método comparePassword del modelo User
     const isMatch = await User.comparePassword(password, user.password);
+    
+    console.log('🔍 ¿Coincide la contraseña?', isMatch ? 'SÍ ✅' : 'NO ❌');
+
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -101,6 +118,8 @@ exports.login = async (req, res) => {
       { expiresIn: '7d' },
     );
 
+    console.log('✅ Login exitoso para:', username);
+
     res.json({
       success: true,
       message: 'Login exitoso',
@@ -113,7 +132,7 @@ exports.login = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error en login:', error);
+    console.error('❌ Error en login:', error);
     res.status(500).json({
       success: false,
       message: 'Error al iniciar sesión',
