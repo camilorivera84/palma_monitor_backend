@@ -70,7 +70,7 @@ async function initDatabase() {
 
     // 5. Crear usuario administrador
     const adminCheck = await pool.query(
-      "SELECT * FROM usuarios WHERE username = 'admin'"
+      "SELECT * FROM usuarios WHERE username = 'admin'",
     );
 
     if (adminCheck.rows.length === 0) {
@@ -80,7 +80,7 @@ async function initDatabase() {
       await pool.query(
         `INSERT INTO usuarios (username, email, password, role) 
          VALUES ($1, $2, $3, $4)`,
-        ['admin', 'admin@palma.com', hashedPassword, 'admin']
+        ['admin', 'admin@palma.com', hashedPassword, 'admin'],
       );
       console.log('✅ Usuario admin creado (admin/admin123)');
     } else {
@@ -88,11 +88,15 @@ async function initDatabase() {
     }
 
     console.log('🎉 Base de datos inicializada correctamente');
-    process.exit(0);
+    return {
+      success: true,
+      message: 'Base de datos inicializada correctamente',
+    };
   } catch (error) {
     console.error('❌ Error al inicializar la base de datos:', error.message);
-    process.exit(1);
+    throw error;
   }
 }
 
-initDatabase();
+// Exportar la función correctamente
+module.exports = initDatabase;
