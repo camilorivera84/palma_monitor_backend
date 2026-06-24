@@ -1,3 +1,4 @@
+// src/initDb.js
 const pool = require('./config/database');
 const bcrypt = require('bcryptjs');
 
@@ -5,7 +6,7 @@ async function initDatabase() {
   try {
     console.log('🔧 Iniciando creación de tablas...');
 
-    // Crear todas las tablas
+    // 1. Crear tabla de palmas
     await pool.query(`
       CREATE TABLE IF NOT EXISTS palmas (
         id SERIAL PRIMARY KEY,
@@ -21,6 +22,7 @@ async function initDatabase() {
     `);
     console.log('✅ Tabla palmas creada');
 
+    // 2. Crear tabla de usuarios
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -33,6 +35,7 @@ async function initDatabase() {
     `);
     console.log('✅ Tabla usuarios creada');
 
+    // 3. Crear tabla de enfermedades
     await pool.query(`
       CREATE TABLE IF NOT EXISTS enfermedades (
         id SERIAL PRIMARY KEY,
@@ -48,6 +51,7 @@ async function initDatabase() {
     `);
     console.log('✅ Tabla enfermedades creada');
 
+    // 4. Crear tabla de plagas
     await pool.query(`
       CREATE TABLE IF NOT EXISTS plagas (
         id SERIAL PRIMARY KEY,
@@ -64,29 +68,35 @@ async function initDatabase() {
     `);
     console.log('✅ Tabla plagas creada');
 
-    // ELIMINAR usuarios existentes para limpiar
-    await pool.query(`DELETE FROM usuarios WHERE username IN ('admin', 'admin2', 'admin3')`);
-    console.log('🗑️ Usuarios anteriores eliminados');
+    // 5. ELIMINAR usuarios existentes para limpiar
+    await pool.query(`DELETE FROM usuarios WHERE username = 'admin'`);
+    console.log('🗑️ Usuario admin anterior eliminado');
 
-    // Generar hash NUEVO para admin123
+    // 6. Crear usuario admin con contraseña admin123
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash('admin123', salt);
     console.log('🔑 Hash generado:', hashedPassword);
 
-    // Insertar admin con hash nuevo
-    await pool.query(`
+    await pool.query(
+      `
       INSERT INTO usuarios (username, email, password, role) 
       VALUES ($1, $2, $3, $4)
-    `, ['admin', 'admin@palma.com', hashedPassword, 'admin']);
+    `,
+      ['admin', 'admin@palma.com', hashedPassword, 'admin'],
+    );
 
     console.log('✅ Usuario admin creado con contraseña admin123');
 
     console.log('🎉 Base de datos inicializada correctamente');
-    return { success: true, message: 'Base de datos inicializada correctamente' };
+    return {
+      success: true,
+      message: 'Base de datos inicializada correctamente',
+    };
   } catch (error) {
     console.error('❌ Error al inicializar la base de datos:', error.message);
     throw error;
   }
 }
 
+// ✅ EXPORTAR LA FUNCIÓN CORRECTAMENTE
 module.exports = initDatabase;
