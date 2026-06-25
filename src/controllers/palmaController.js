@@ -22,7 +22,6 @@ exports.importCSV = async (req, res) => {
     const filePath = req.file.path;
     console.log('📂 Ruta del archivo:', filePath);
 
-    // Verificar que el archivo existe
     if (!fs.existsSync(filePath)) {
       console.log('❌ El archivo no existe:', filePath);
       return res.status(400).json({
@@ -94,22 +93,12 @@ exports.importCSV = async (req, res) => {
           );
         }
 
+        // ✅ SIN ON CONFLICT - INSERT simple
         const query = `
           INSERT INTO public.palmas 
           (id, lote, linea, palma, estado, codigo_estado, descarte, 
            latitud, longitud, norte, este)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-          ON CONFLICT (id) DO UPDATE SET
-            lote = EXCLUDED.lote,
-            linea = EXCLUDED.linea,
-            palma = EXCLUDED.palma,
-            estado = EXCLUDED.estado,
-            codigo_estado = EXCLUDED.codigo_estado,
-            descarte = EXCLUDED.descarte,
-            latitud = EXCLUDED.latitud,
-            longitud = EXCLUDED.longitud,
-            norte = EXCLUDED.norte,
-            este = EXCLUDED.este
         `;
 
         await pool.query(query, [
@@ -190,7 +179,6 @@ exports.getAll = async (req, res) => {
       ORDER BY id
     `);
 
-    // Agregar campo geom para compatibilidad con el frontend
     const data = result.rows.map((row) => ({
       ...row,
       geom:
