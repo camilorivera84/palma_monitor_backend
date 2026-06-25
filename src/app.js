@@ -20,27 +20,28 @@ const PORT = process.env.PORT || 5000;
 // MIDDLEWARES
 // ============================================
 
-// Configuración CORS mejorada para permitir peticiones desde el frontend
-const corsOptions = {
-  origin: [
-    'https://palma-monitor-frontend.pages.dev',
-    'https://*.palma-monitor-frontend.pages.dev',
-    'https://5b498b48.palma-monitor-frontend.pages.dev',
-    'http://localhost:5173',
-    'http://localhost:3000',
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-};
-
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+// ✅ CONFIGURACIÓN CORS CORREGIDA
+app.use(
+  cors({
+    origin: '*',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }),
+);
 
 // ============================================
 // MANEJO EXPLÍCITO DE SOLICITUDES OPTIONS
 // ============================================
-app.options('*', cors(corsOptions));
+app.options(
+  '*',
+  cors({
+    origin: '*',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }),
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -85,13 +86,9 @@ app.get('/init-db', async (req, res) => {
   }
 });
 
-// ============================================
-// RUTA TEMPORAL PARA AGREGAR COLUMNAS FALTANTES
-// ============================================
+// Ruta temporal para agregar columnas faltantes
 app.get('/add-column', async (req, res) => {
   try {
-    // Columnas que tu código puede estar buscando
-    // pero que no existen en tu tabla
     const columnsToAdd = [
       { name: 'sur', type: 'VARCHAR(20)' },
       { name: 'oeste', type: 'VARCHAR(20)' },
@@ -111,7 +108,6 @@ app.get('/add-column', async (req, res) => {
 
     for (const col of columnsToAdd) {
       try {
-        // Verificar si la columna existe
         const checkColumn = await pool.query(
           `
           SELECT column_name 
@@ -122,7 +118,6 @@ app.get('/add-column', async (req, res) => {
         );
 
         if (checkColumn.rows.length === 0) {
-          // Agregar la columna
           await pool.query(`
             ALTER TABLE palmas 
             ADD COLUMN ${col.name} ${col.type};
@@ -151,9 +146,7 @@ app.get('/add-column', async (req, res) => {
   }
 });
 
-// ============================================
-// RUTA TEMPORAL PARA VER ESTRUCTURA DE TABLA
-// ============================================
+// Ruta para ver estructura de tabla
 app.get('/table-structure', async (req, res) => {
   try {
     const result = await pool.query(`
