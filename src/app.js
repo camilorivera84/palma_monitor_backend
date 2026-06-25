@@ -25,6 +25,7 @@ const corsOptions = {
   origin: [
     'https://palma-monitor-frontend.pages.dev',
     'https://*.palma-monitor-frontend.pages.dev',
+    'https://5b498b48.palma-monitor-frontend.pages.dev',
     'http://localhost:5173',
     'http://localhost:3000',
   ],
@@ -34,6 +35,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // ============================================
 // MANEJO EXPLÍCITO DE SOLICITUDES OPTIONS
